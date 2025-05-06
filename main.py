@@ -93,9 +93,10 @@ def webhook():
     msg = (
         f"{emoji} {direction} signal for {ticker}\n"
         f"💵 Entry: {price}\n"
+        f"📊 Lot Size: {lot}\n"
         f"🎯 TP: {tp}\n"
-        f"🛑 SL: {sl}\n"
-        f"📊 Lot Size: {lot}"
+        f"🛑 SL: {sl}"
+        
     )
 
     send_telegram(msg)
