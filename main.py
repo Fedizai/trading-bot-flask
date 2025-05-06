@@ -5,7 +5,7 @@ import os
 app = Flask(__name__)
 
 # === CONFIGURATION ===
-RISK_PERCENT = 0.01  # 1% of capital per trade
+RISK_PERCENT = 0.05  # 5% of capital per trade (UPDATED)
 ACCOUNT_BALANCE = 200.0  # Initial account balance
 
 # Contract size per symbol
@@ -50,8 +50,15 @@ def calculate_lot_size(ticker, entry_price, stop_loss):
     contract_value = CONTRACT_SIZE.get(ticker, 1)
     loss_per_lot = price_diff * contract_value
     if loss_per_lot == 0:
-        return 0.01  # minimum lot
+        return 0.01  # minimum lot if error
     lot_size = risk_amount / loss_per_lot
+
+    # Force minimum lot sizes
+    if ticker == 'XAUUSD' and lot_size < 0.02:
+        lot_size = 0.02
+    elif ticker == 'EURUSD' and lot_size < 0.03:
+        lot_size = 0.03
+
     return round(lot_size, 3)
 
 def send_telegram(message):
@@ -96,7 +103,6 @@ def webhook():
         f"📊 Lot Size: {lot}\n"
         f"🎯 TP: {tp}\n"
         f"🛑 SL: {sl}"
-        
     )
 
     send_telegram(msg)
