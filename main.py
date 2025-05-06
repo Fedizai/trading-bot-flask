@@ -5,7 +5,7 @@ import os
 app = Flask(__name__)
 
 # === CONFIGURATION ===
-RISK_PERCENT = 0.05  # 5% of capital per trade (UPDATED)
+RISK_PERCENT = 0.05  # 5% of capital per trade
 ACCOUNT_BALANCE = 200.0  # Initial account balance
 
 # Contract size per symbol
@@ -84,30 +84,34 @@ def home():
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    data = request.get_json(force=True)
-    if not data:
-        return 'No data', 400
+    try:
+        data = request.get_json(force=True)
+        if not data:
+            return 'No data', 400
 
-    ticker = data.get('ticker')
-    price = float(data.get('close'))
-    direction = data.get('action', 'BUY').upper()
+        ticker = data.get('ticker')
+        price = float(data.get('close'))
+        direction = data.get('action', 'BUY').upper()
 
-    atr = get_atr_value(ticker)
-    tp, sl = calculate_tp_sl(price, direction, atr)
-    lot = calculate_lot_size(ticker, price, sl)
+        atr = get_atr_value(ticker)
+        tp, sl = calculate_tp_sl(price, direction, atr)
+        lot = calculate_lot_size(ticker, price, sl)
 
-    emoji = "🟢" if direction == "BUY" else "🔴"
-    msg = (
-        f"{emoji} {direction} signal for {ticker}\n"
-        f"💵 Entry: {price}\n"
-        f"📊 Lot Size: {lot}\n"
-        f"🎯 TP: {tp}\n"
-        f"🛑 SL: {sl}"
-    )
+        emoji = "🟢" if direction == "BUY" else "🔴"
+        msg = (
+            f"{emoji} {direction} signal for {ticker}\n"
+            f"💵 Entry: {price}\n"
+            f"📊 Lot Size: {lot}\n"
+            f"🎯 TP: {tp}\n"
+            f"🛑 SL: {sl}"
+        )
 
-    send_telegram(msg)
+        send_telegram(msg)
+        return 'Signal processed ✅', 200
 
-    return 'Signal processed ✅', 200
+    except Exception as e:
+        print(f"Webhook error: {e}")
+        return 'Webhook failed ❌', 500
 
 # === RUN FLASK SERVER ===
 
