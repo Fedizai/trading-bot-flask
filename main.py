@@ -4,88 +4,106 @@ import os
 
 app = Flask(__name__)
 
-# === CONFIG ===
-TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
-TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
+# === CONFIGURATION ===
+RISK_PERCENT = 0.01  # 1% of capital per trade
+ACCOUNT_BALANCE = 200.0  # Initial account balance
 
-RISK_PERCENT = 1  # 1% risk per trade
-TP_DISTANCE = 100  # Take Profit distance
-SL_DISTANCE = 100  # Stop Loss distance
+# Contract size per symbol
+CONTRACT_SIZE = {
+    'XAUUSD': 100,     # 1 lot = 100 ounces
+    'EURUSD': 100000,  # 1 lot = 100k EUR
+    'BTCUSD': 1        # 1 lot = 1 BTC
+}
 
-current_balance = 1000  # Default balance at startup
+# ATR Multipliers
+ATR_MULT_SL = 1.5  # Stop Loss = 1.5 x ATR
+ATR_MULT_TP = 3.0  # Take Profit = 3.0 x ATR
+
+# === TELEGRAM (SECURE from Environment Variables) ===
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
 # === FUNCTIONS ===
-def send_telegram_message(message):
 
+def get_atr_value(ticker):
+    atr_values = {
+        'XAUUSD': 5.0,
+        'EURUSD': 0.0020,
+        'BTCUSD': 500.0
+    }
+    return atr_values.get(ticker, 1.0)  # default 1.0
+
+def calculate_tp_sl(entry_price, direction, atr_value):
+    sl_distance = ATR_MULT_SL * atr_value
+    tp_distance = ATR_MULT_TP * atr_value
+    if direction == "BUY":
+        sl = entry_price - sl_distance
+        tp = entry_price + tp_distance
+    else:
+        sl = entry_price + sl_distance
+        tp = entry_price - tp_distance
+    return round(tp, 2), round(sl, 2)
+
+def calculate_lot_size(ticker, entry_price, stop_loss):
+    risk_amount = ACCOUNT_BALANCE * RISK_PERCENT
+    price_diff = abs(entry_price - stop_loss)
+    contract_value = CONTRACT_SIZE.get(ticker, 1)
+    loss_per_lot = price_diff * contract_value
+    if loss_per_lot == 0:
+        return 0.01  # minimum lot
+    lot_size = risk_amount / loss_per_lot
+    return round(lot_size, 3)
+
+def send_telegram(message):
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print("Telegram token or chat id missing.")
+        return
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
         "text": message
     }
     try:
-        response = requests.post(url, data=payload)
-        print(f"Telegram Response: {response.text}")
+        r = requests.post(url, data=payload)
+        print("Telegram Response:", r.text)
     except Exception as e:
-        print(f"Telegram Error: {e}")
+        print("Telegram Error:", e)
 
 # === ROUTES ===
+
 @app.route('/')
 def home():
-    return 'Bot is running! 🚀'
+    return 'Bot is running! ✅'
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    global current_balance
+    data = request.get_json(force=True)
+    if not data:
+        return 'No data', 400
 
-    print("Webhook received!")
-
-    data = request.json
-    symbol = data.get('ticker')
+    ticker = data.get('ticker')
     price = float(data.get('close'))
-    side = data.get('action', 'SELL')
+    direction = data.get('action', 'BUY').upper()
 
-    # Safe lot size
-    if price > 0 and current_balance > 0:
-        risk_amount = current_balance * (RISK_PERCENT / 100)
-        lot_size = round(risk_amount / price, 3)
-    else:
-        lot_size = 0.01
+    atr = get_atr_value(ticker)
+    tp, sl = calculate_tp_sl(price, direction, atr)
+    lot = calculate_lot_size(ticker, price, sl)
 
-    # Calculate TP and SL
-    if side.upper() == "SELL":
-        tp = round(price - TP_DISTANCE, 2)
-        sl = round(price + SL_DISTANCE, 2)
-    else:  # BUY
-        tp = round(price + TP_DISTANCE, 2)
-        sl = round(price - SL_DISTANCE, 2)
+    emoji = "🟢" if direction == "BUY" else "🔴"
+    msg = (
+        f"{emoji} {direction} signal for {ticker}\n"
+        f"💵 Entry: {price}\n"
+        f"🎯 TP: {tp}\n"
+        f"🛑 SL: {sl}\n"
+        f"📊 Lot Size: {lot}"
+    )
 
-    emoji = "🔴" if side.upper() == "SELL" else "🟢"
+    send_telegram(msg)
 
-    message = f"""{emoji} {side.upper()} signal on {symbol}
-💵 Entry: {price}
-📊 Lot Size: {lot_size}
-🎯 TP: {tp}
-🛑 SL: {sl}
-"""
+    return 'Signal processed ✅', 200
 
-    send_telegram_message(message)
-    return 'Signal Sent!'
+# === RUN FLASK SERVER ===
 
-@app.route('/balance', methods=['POST'])
-def update_balance():
-    global current_balance
-
-    data = request.json
-    new_balance = float(data.get('balance'))
-
-    if new_balance > 0:
-        current_balance = new_balance
-        send_telegram_message(f"✅ Balance updated to ${current_balance}")
-        return 'Balance Updated!'
-    else:
-        return 'Invalid balance value!', 400
-
-# === RUN SERVER ===
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 3000))
+if __name__ == "__main__":
+    port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
