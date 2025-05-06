@@ -16,13 +16,17 @@ current_balance = 1000  # Default balance at startup
 
 # === FUNCTIONS ===
 def send_telegram_message(message):
+    print(f"Using Telegram Token: {TELEGRAM_BOT_TOKEN}")
+    print(f"Using Chat ID: {TELEGRAM_CHAT_ID}")
+
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
         "text": message
     }
     try:
-        requests.post(url, data=payload)
+        response = requests.post(url, data=payload)
+        print(f"Telegram Response: {response.text}")
     except Exception as e:
         print(f"Telegram Error: {e}")
 
