@@ -5,8 +5,8 @@ import os
 app = Flask(__name__)
 
 # === CONFIG ===
-TELEGRAM_BOT_TOKEN = '7615698566:AAH9eDdGGxlPuNrbfbdToXYlUSF0hxtjToY'
-TELEGRAM_CHAT_ID = '5439089395'
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 
 RISK_PERCENT = 1  # 1% risk per trade
 TP_DISTANCE = 100  # Take Profit distance
