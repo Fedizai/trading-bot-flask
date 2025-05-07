@@ -1,12 +1,16 @@
 from flask import Flask, request
 import requests
 import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 
 # === CONFIGURATION ===
 RISK_PERCENT = 0.05  # 5% of capital per trade
-ACCOUNT_BALANCE = 200.0  # Initial account balance
+balance = 200.0  # Initial account balance
 
 # Contract size per symbol
 CONTRACT_SIZE = {
@@ -45,7 +49,7 @@ def calculate_tp_sl(entry_price, direction, atr_value):
     return round(tp, 2), round(sl, 2)
 
 def calculate_lot_size(ticker, entry_price, stop_loss):
-    risk_amount = ACCOUNT_BALANCE * RISK_PERCENT
+    risk_amount = balance * RISK_PERCENT
     price_diff = abs(entry_price - stop_loss)
     contract_value = CONTRACT_SIZE.get(ticker, 1)
     loss_per_lot = price_diff * contract_value
@@ -84,6 +88,7 @@ def home():
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
+    global balance
     try:
         data = request.get_json(force=True)
         if not data:
@@ -103,7 +108,8 @@ def webhook():
             f"💵 Entry: {price}\n"
             f"📊 Lot Size: {lot}\n"
             f"🎯 TP: {tp}\n"
-            f"🛑 SL: {sl}"
+            f"🛑 SL: {sl}\n"
+            f"\nBalance: {balance:.2f} USD"
         )
 
         send_telegram(msg)
