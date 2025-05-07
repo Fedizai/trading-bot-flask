@@ -96,23 +96,51 @@ def webhook():
 
         ticker = data.get('ticker')
         price = float(data.get('close'))
-        direction = data.get('action', 'BUY').upper()
+        action = data.get('action', 'BUY').upper()
 
-        atr = get_atr_value(ticker)
-        tp, sl = calculate_tp_sl(price, direction, atr)
-        lot = calculate_lot_size(ticker, price, sl)
+        # Entry Signal (Buy/Sell)
+        if action in ['BUY', 'SELL']:
+            atr = get_atr_value(ticker)
+            tp, sl = calculate_tp_sl(price, action, atr)
+            lot = calculate_lot_size(ticker, price, sl)
 
-        emoji = "🟢" if direction == "BUY" else "🔴"
-        msg = (
-            f"{emoji} {direction} signal for {ticker}\n"
-            f"💵 Entry: {price}\n"
-            f"📊 Lot Size: {lot}\n"
-            f"🎯 TP: {tp}\n"
-            f"🛑 SL: {sl}\n"
-            f"\nBalance: {balance:.2f} USD"
-        )
+            emoji = "🟢" if action == "BUY" else "🔴"
+            msg = (
+                f"{emoji} {action} signal for {ticker}\n"
+                f"💵 Entry: {price}\n"
+                f"📊 Lot Size: {lot}\n"
+                f"🎯 TP: {tp}\n"
+                f"🛑 SL: {sl}\n"
+                f"\nBalance: {balance:.2f} USD"
+            )
+            send_telegram(msg)
 
-        send_telegram(msg)
+        # TP HIT
+        elif action == 'TP HIT':
+            profit = balance * RISK_PERCENT * 2  # Approximate TP = 2x risk reward
+            balance += profit
+            profit_percent = (profit / (balance - profit)) * 100
+
+            msg = (
+                f"🎯 TAKE PROFIT HIT on {ticker}!\n"
+                f"✅ Profit: +{profit_percent:.2f}%\n"
+                f"💵 New Balance: {balance:.2f} USD"
+            )
+            send_telegram(msg)
+
+        # SL HIT
+        elif action == 'SL HIT':
+            loss = balance * RISK_PERCENT
+            balance -= loss
+            loss_percent = (loss / (balance + loss)) * 100
+
+            msg = (
+                f"🛑 STOP LOSS HIT on {ticker}.\n"
+                f"❌ Loss: -{loss_percent:.2f}%\n"
+                f"💵 New Balance: {balance:.2f} USD"
+            )
+            send_telegram(msg)
+
         return 'Signal processed ✅', 200
 
     except Exception as e:
